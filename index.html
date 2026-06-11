@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>14/1 Punktezähler</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101213;
+        --panel: #181c1d;
+        --panel-strong: #202627;
+        --table: #18765b;
+        --table-dark: #0f4f3d;
+        --line: #303839;
+        --text: #f2f4ef;
+        --muted: #aab4ad;
+        --danger: #e35f57;
+        --warning: #e3b04b;
+        --ok: #5ad39a;
+        --shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(24, 118, 91, 0.22), transparent 34rem),
+          linear-gradient(135deg, #0e1011 0%, #151819 50%, #0f1212 100%);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+      }
+
+      .app {
+        width: min(1180px, calc(100% - 28px));
+        margin: 0 auto;
+        padding: 28px 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 20px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .ball {
+        display: grid;
+        width: 44px;
+        height: 44px;
+        place-items: center;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 34% 28%, #ffffff 0 16%, transparent 17%),
+          radial-gradient(circle at 50% 50%, #f9f9f0 0 30%, #101213 31% 34%, #eeb62f 35% 100%);
+        color: #121212;
+        font-weight: 900;
+        box-shadow: var(--shadow);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(1.45rem, 3vw, 2.45rem);
+        line-height: 1.02;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      .foul-hint {
+        margin-top: 10px;
+        color: var(--warning);
+        font-size: 0.88rem;
+        font-weight: 800;
+      }
+
+      .top-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 16px;
+      }
+
+      .scoreboard,
+      .side,
+      .setup {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(24, 28, 29, 0.92);
+        box-shadow: var(--shadow);
+      }
+
+      .scoreboard {
+        overflow: hidden;
+      }
+
+      .table-felt {
+        position: relative;
+        padding: 20px;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 9%, transparent 91%, rgba(0, 0, 0, 0.12)),
+          linear-gradient(180deg, var(--table), var(--table-dark));
+      }
+
+      .table-felt::before {
+        content: "";
+        position: absolute;
+        inset: 12px;
+        pointer-events: none;
+        border: 2px solid rgba(255, 255, 255, 0.24);
+        border-radius: 14px;
+      }
+
+      .players {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .player {
+        min-height: 276px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 8px;
+        background: rgba(10, 14, 14, 0.35);
+        transition:
+          transform 160ms ease,
+          background 160ms ease,
+          border-color 160ms ease;
+      }
+
+      .player.active {
+        border-color: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.12);
+        transform: translateY(-2px);
+      }
+
+      .player.winner {
+        border-color: var(--ok);
+        box-shadow: inset 0 0 0 1px rgba(90, 211, 154, 0.4);
+      }
+
+      .player-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .player-name {
+        overflow: hidden;
+        font-size: 1.15rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .badge {
+        min-width: 72px;
+        padding: 6px 9px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        color: var(--text);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .score {
+        margin: 20px 0 8px;
+        font-size: clamp(4.6rem, 12vw, 8.5rem);
+        font-weight: 900;
+        line-height: 0.9;
+      }
+
+      .meta-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .metric {
+        min-height: 72px;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.22);
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 0.76rem;
+      }
+
+      .metric-value {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.35rem;
+        font-weight: 850;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .control-panel {
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .section-title {
+        margin-bottom: 12px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .number-input,
+      .text-input {
+        width: 100%;
+        min-height: 46px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0f1212;
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .quick-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .btn {
+        min-height: 44px;
+        border-radius: 8px;
+        background: var(--panel-strong);
+        color: var(--text);
+        font-weight: 800;
+      }
+
+      .btn:hover:not(:disabled),
+      .btn:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.22);
+        outline-offset: 2px;
+      }
+
+      .btn.primary {
+        background: #f2f4ef;
+        color: #101213;
+      }
+
+      .btn.ok {
+        background: var(--ok);
+        color: #06110c;
+      }
+
+      .btn.warn {
+        background: var(--warning);
+        color: #171107;
+      }
+
+      .btn.danger {
+        background: var(--danger);
+        color: #fff;
+      }
+
+      .wide {
+        width: 100%;
+      }
+
+      .rebuild-button {
+        margin-top: 18px;
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .side {
+        padding: 16px;
+      }
+
+      .status {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .status-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        background: var(--panel-strong);
+      }
+
+      .status-line span:first-child {
+        color: var(--muted);
+      }
+
+      .status-line strong {
+        text-align: right;
+      }
+
+      .history {
+        display: grid;
+        max-height: 418px;
+        overflow: auto;
+        gap: 8px;
+        padding-right: 4px;
+      }
+
+      .event {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #121616;
+      }
+
+      .event-main {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-weight: 800;
+      }
+
+      .event-sub {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .empty {
+        padding: 18px;
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .setup {
+        display: none;
+        margin-bottom: 16px;
+        padding: 16px;
+      }
+
+      .setup.open {
+        display: block;
+      }
+
+      .setup-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        align-items: end;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .winner-banner {
+        display: none;
+        margin-top: 14px;
+        padding: 14px;
+        border-radius: 8px;
+        background: rgba(90, 211, 154, 0.16);
+        color: var(--ok);
+        font-weight: 850;
+      }
+
+      .winner-banner.show {
+        display: block;
+      }
+
+      .footer {
+        padding: 18px 0 4px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-align: center;
+      }
+
+      @media (max-width: 900px) {
+        .shell,
+        .players,
+        .controls,
+        .setup-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .top-actions {
+          justify-content: flex-start;
+        }
+
+        .player {
+          min-height: 236px;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .app {
+          width: min(100% - 18px, 1180px);
+          padding: 14px 0;
+        }
+
+        .table-felt,
+        .controls,
+        .side,
+        .setup {
+          padding: 10px;
+        }
+
+        .player {
+          padding: 14px;
+        }
+
+        .quick-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+
+        .meta-row,
+        .action-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .brand {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="ball" aria-hidden="true">14</div>
+          <div>
+            <h1>14/1 Punktezähler</h1>
+            <p class="subtitle">Aufnahmen, Serien, Fouls und Zielpunkte für Straight Pool.</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="btn" id="settingsButton" type="button">Einstellungen</button>
+          <button class="btn" id="undoButton" type="button">Undo</button>
+          <button class="btn danger" id="resetButton" type="button">Neues Spiel</button>
+        </div>
+      </header>
+
+      <section class="setup" id="setupPanel" aria-label="Spieleinstellungen">
+        <div class="setup-grid">
+          <label>
+            Spieler 1
+            <input class="text-input" id="playerOneInput" value="Spieler 1" />
+          </label>
+          <label>
+            Spieler 2
+            <input class="text-input" id="playerTwoInput" value="Spieler 2" />
+          </label>
+          <label>
+            Ziel
+            <input class="number-input" id="targetInput" min="1" max="300" value="100" type="number" />
+          </label>
+          <button class="btn primary" id="applySettingsButton" type="button">Übernehmen</button>
+        </div>
+      </section>
+
+      <section class="shell">
+        <div class="scoreboard">
+          <div class="table-felt">
+            <div class="players" id="players"></div>
+            <div class="winner-banner" id="winnerBanner"></div>
+          </div>
+
+          <div class="controls">
+            <section class="control-panel" aria-label="Kugel am Tisch">
+              <h2 class="section-title">Kugel am Tisch</h2>
+              <div class="quick-grid" id="quickButtons"></div>
+              <button class="btn wide rebuild-button" id="rebuildTableButton" type="button">Tisch aufgebaut</button>
+            </section>
+
+            <section class="control-panel" aria-label="Aufnahme steuern">
+              <h2 class="section-title">Aufnahme</h2>
+              <div class="action-grid">
+                <button class="btn" id="missButton" type="button">Fehlstoß</button>
+                <button class="btn warn" id="foulButton" type="button">Foul -1</button>
+                <button class="btn" id="switchButton" type="button">Wechseln</button>
+                <button class="btn" id="zeroButton" type="button">0er Aufnahme</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <aside class="side">
+          <div class="status">
+            <div class="status-line">
+              <span>Aktiv</span>
+              <strong id="activePlayerLabel"></strong>
+            </div>
+            <div class="status-line">
+              <span>Ziel</span>
+              <strong id="targetLabel"></strong>
+            </div>
+            <div class="status-line">
+              <span>Kugeln am Tisch</span>
+              <strong id="tableBallsLabel"></strong>
+            </div>
+            <div class="status-line">
+              <span>Letzte Aktion</span>
+              <strong id="lastActionLabel"></strong>
+            </div>
+          </div>
+
+          <h2 class="section-title">Verlauf</h2>
+          <div class="history" id="history"></div>
+        </aside>
+      </section>
+
+      <footer class="footer">Designed by CodexFabricator</footer>
+    </main>
+
+    <script>
+      const storageKey = "straightPoolScorekeeperState";
+
+      const defaultState = {
+        target: 100,
+        active: 0,
+        ballsOnTable: 15,
+        winner: null,
+        players: [
+          { name: "Spieler 1", score: 0, innings: 0, highRun: 0, currentRun: 0, fouls: 0 },
+          { name: "Spieler 2", score: 0, innings: 0, highRun: 0, currentRun: 0, fouls: 0 },
+        ],
+        history: [],
+        snapshots: [],
+      };
+
+      let state = loadState();
+
+      const elements = {
+        activePlayerLabel: document.querySelector("#activePlayerLabel"),
+        applySettingsButton: document.querySelector("#applySettingsButton"),
+        foulButton: document.querySelector("#foulButton"),
+        history: document.querySelector("#history"),
+        lastActionLabel: document.querySelector("#lastActionLabel"),
+        missButton: document.querySelector("#missButton"),
+        playerOneInput: document.querySelector("#playerOneInput"),
+        playerTwoInput: document.querySelector("#playerTwoInput"),
+        players: document.querySelector("#players"),
+        quickButtons: document.querySelector("#quickButtons"),
+        rebuildTableButton: document.querySelector("#rebuildTableButton"),
+        resetButton: document.querySelector("#resetButton"),
+        settingsButton: document.querySelector("#settingsButton"),
+        setupPanel: document.querySelector("#setupPanel"),
+        switchButton: document.querySelector("#switchButton"),
+        tableBallsLabel: document.querySelector("#tableBallsLabel"),
+        targetInput: document.querySelector("#targetInput"),
+        targetLabel: document.querySelector("#targetLabel"),
+        undoButton: document.querySelector("#undoButton"),
+        winnerBanner: document.querySelector("#winnerBanner"),
+        zeroButton: document.querySelector("#zeroButton"),
+      };
+
+      function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+      }
+
+      function loadState() {
+        try {
+          const saved = localStorage.getItem(storageKey);
+          return normalizeState(saved ? { ...clone(defaultState), ...JSON.parse(saved) } : clone(defaultState));
+        } catch {
+          return clone(defaultState);
+        }
+      }
+
+      function normalizeState(nextState) {
+        if (!Number.isFinite(nextState.ballsOnTable)) {
+          nextState.ballsOnTable = 15;
+        }
+        nextState.ballsOnTable = Math.max(1, Math.min(15, nextState.ballsOnTable));
+        nextState.players = nextState.players.map((player, index) => ({
+          ...clone(defaultState.players[index]),
+          ...player,
+          currentRun: Number.isFinite(player.currentRun) ? player.currentRun : 0,
+        }));
+        return nextState;
+      }
+
+      function saveState() {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      }
+
+      function snapshot() {
+        const copy = clone(state);
+        copy.snapshots = [];
+        state.snapshots.push(copy);
+        state.snapshots = state.snapshots.slice(-50);
+      }
+
+      function activePlayer() {
+        return state.players[state.active];
+      }
+
+      function otherPlayerIndex() {
+        return state.active === 0 ? 1 : 0;
+      }
+
+      function addHistory(title, detail, delta = "") {
+        state.history.unshift({
+          title,
+          detail,
+          delta,
+          time: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
+        });
+        state.history = state.history.slice(0, 80);
+      }
+
+      function checkWinner() {
+        const winnerIndex = state.players.findIndex((player) => player.score >= state.target);
+        state.winner = winnerIndex >= 0 ? winnerIndex : null;
+      }
+
+      function switchTurn(countInning = true) {
+        if (countInning) {
+          activePlayer().innings += 1;
+        }
+        state.active = otherPlayerIndex();
+      }
+
+      function calculatePocketedBalls(nextBallsOnTable) {
+        return Math.max(0, state.ballsOnTable - nextBallsOnTable);
+      }
+
+      function recordBallsOnTable(value) {
+        const nextBallsOnTable = Number(value);
+        if (
+          !Number.isInteger(nextBallsOnTable) ||
+          nextBallsOnTable < 1 ||
+          nextBallsOnTable > 15 ||
+          nextBallsOnTable > state.ballsOnTable ||
+          state.winner !== null
+        ) {
+          return;
+        }
+
+        snapshot();
+        const player = activePlayer();
+        const amount = calculatePocketedBalls(nextBallsOnTable);
+        player.score += amount;
+        player.currentRun += amount;
+        player.highRun = Math.max(player.highRun, player.currentRun);
+        player.fouls = 0;
+        state.ballsOnTable = nextBallsOnTable;
+        addHistory(
+          player.name,
+          `${nextBallsOnTable} Kugel${nextBallsOnTable === 1 ? "" : "n"} am Tisch · ${amount} Punkt${
+            amount === 1 ? "" : "e"
+          }`,
+          `+${amount}`,
+        );
+        checkWinner();
+        persistAndRender();
+      }
+
+      function rebuildTable() {
+        if (state.winner !== null || state.ballsOnTable !== 1) return;
+
+        snapshot();
+        const previousBallsOnTable = state.ballsOnTable;
+        state.ballsOnTable = Math.min(15, state.ballsOnTable + 14);
+        addHistory(
+          "Tisch",
+          `Neu aufgebaut: ${previousBallsOnTable} → ${state.ballsOnTable} Kugel${
+            state.ballsOnTable === 1 ? "" : "n"
+          } am Tisch`,
+          "",
+        );
+        persistAndRender();
+      }
+
+      function recordMiss(label = "Fehlstoß") {
+        if (state.winner !== null) return;
+
+        snapshot();
+        const player = activePlayer();
+        player.fouls = 0;
+        player.currentRun = 0;
+        addHistory(player.name, label, "0");
+        switchTurn(true);
+        persistAndRender();
+      }
+
+      function recordFoul() {
+        if (state.winner !== null) return;
+
+        snapshot();
+        const player = activePlayer();
+        player.fouls += 1;
+        player.currentRun = 0;
+        const thirdFoul = player.fouls >= 3;
+        const penalty = thirdFoul ? 15 : 1;
+        player.score -= penalty;
+        const detail = thirdFoul
+          ? "Drittes Foul in Folge: 15 Strafpunkte"
+          : `${player.fouls}. Foul in Folge · Hinweis an ${player.name}: ${3 - player.fouls} Foul${
+              3 - player.fouls === 1 ? "" : "s"
+            } bis zur 15-Punkte-Strafe`;
+        addHistory(player.name, detail, `-${penalty}`);
+        if (thirdFoul) {
+          player.fouls = 0;
+        }
+        switchTurn(true);
+        persistAndRender();
+      }
+
+      function manualSwitch() {
+        if (state.winner !== null) return;
+
+        snapshot();
+        activePlayer().currentRun = 0;
+        addHistory(activePlayer().name, "Spielerwechsel ohne Wertung", "");
+        state.active = otherPlayerIndex();
+        persistAndRender();
+      }
+
+      function applySettings() {
+        snapshot();
+        state.players[0].name = elements.playerOneInput.value.trim() || "Spieler 1";
+        state.players[1].name = elements.playerTwoInput.value.trim() || "Spieler 2";
+        state.target = Math.max(1, Math.min(300, Number(elements.targetInput.value) || 100));
+        elements.setupPanel.classList.remove("open");
+        addHistory("Einstellungen", `Ziel auf ${state.target} gesetzt`, "");
+        checkWinner();
+        persistAndRender();
+      }
+
+      function resetGame() {
+        const names = state.players.map((player) => player.name);
+        const target = state.target;
+        state = clone(defaultState);
+        state.players[0].name = names[0] || "Spieler 1";
+        state.players[1].name = names[1] || "Spieler 2";
+        state.target = target;
+        addHistory("Neues Spiel", "Zähler zurückgesetzt", "");
+        persistAndRender();
+      }
+
+      function undo() {
+        const previous = state.snapshots.pop();
+        if (!previous) return;
+
+        const snapshots = state.snapshots;
+        state = normalizeState(previous);
+        state.snapshots = snapshots;
+        persistAndRender();
+      }
+
+      function persistAndRender() {
+        saveState();
+        render();
+      }
+
+      function renderPlayers() {
+        elements.players.innerHTML = state.players
+          .map((player, index) => {
+            const remaining = Math.max(0, state.target - player.score);
+            const isActive = index === state.active;
+            const isWinner = index === state.winner;
+            const warning = player.fouls > 0 ? `${player.fouls} Foul${player.fouls === 1 ? "" : "s"}` : isActive ? "Am Tisch" : "Wartet";
+            const foulHint =
+              player.fouls > 0
+                ? `<p class="foul-hint">Hinweis: ${3 - player.fouls} Foul${
+                    3 - player.fouls === 1 ? "" : "s"
+                  } bis zur 15-Punkte-Strafe. Ein gültiger Stoß löscht die Folge.</p>`
+                : "";
+            return `
+              <article class="player ${isActive ? "active" : ""} ${isWinner ? "winner" : ""}">
+                <div class="player-head">
+                  <h2 class="player-name">${escapeHtml(player.name)}</h2>
+                  <span class="badge">${warning}</span>
+                </div>
+                <div class="score">${player.score}</div>
+                <p class="subtitle">Noch ${remaining} bis ${state.target}</p>
+                ${foulHint}
+                <div class="meta-row">
+                  <div class="metric">
+                    <span class="metric-label">Aufnahmen</span>
+                    <strong class="metric-value">${player.innings}</strong>
+                  </div>
+                  <div class="metric">
+                    <span class="metric-label">Höchstserie</span>
+                    <strong class="metric-value">${player.highRun}</strong>
+                  </div>
+                  <div class="metric">
+                    <span class="metric-label">Fouls</span>
+                    <strong class="metric-value">${player.fouls}/3</strong>
+                  </div>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function renderHistory() {
+        elements.history.innerHTML = state.history.length
+          ? state.history
+              .map(
+                (event) => `
+                  <div class="event">
+                    <div class="event-main">
+                      <span>${escapeHtml(event.title)}</span>
+                      <span>${escapeHtml(event.delta)}</span>
+                    </div>
+                    <div class="event-sub">${escapeHtml(event.time)} · ${escapeHtml(event.detail)}</div>
+                  </div>
+                `,
+              )
+              .join("")
+          : `<div class="empty">Noch keine Einträge</div>`;
+      }
+
+      function renderQuickButtons() {
+        elements.quickButtons.innerHTML = [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+          .map(
+            (value) =>
+              `<button class="btn" type="button" data-balls-on-table="${value}" ${
+                value > state.ballsOnTable || state.winner !== null ? "disabled" : ""
+              }>${value}</button>`,
+          )
+          .join("");
+      }
+
+      function render() {
+        renderPlayers();
+        renderHistory();
+        renderQuickButtons();
+        const gameOver = state.winner !== null;
+        elements.activePlayerLabel.textContent = activePlayer().name;
+        elements.targetLabel.textContent = `${state.target} Punkte`;
+        elements.tableBallsLabel.textContent = `${state.ballsOnTable} Kugel${state.ballsOnTable === 1 ? "" : "n"}`;
+        elements.lastActionLabel.textContent = state.history[0]?.detail || "Noch keine";
+        elements.playerOneInput.value = state.players[0].name;
+        elements.playerTwoInput.value = state.players[1].name;
+        elements.foulButton.disabled = gameOver;
+        elements.missButton.disabled = gameOver;
+        elements.rebuildTableButton.disabled = gameOver || state.ballsOnTable !== 1;
+        elements.switchButton.disabled = gameOver;
+        elements.targetInput.value = state.target;
+        elements.undoButton.disabled = state.snapshots.length === 0;
+        elements.zeroButton.disabled = gameOver;
+        elements.winnerBanner.textContent =
+          state.winner === null ? "" : `${state.players[state.winner].name} hat das Ziel erreicht.`;
+        elements.winnerBanner.classList.toggle("show", state.winner !== null);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => {
+          const entities = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;",
+          };
+          return entities[character];
+        });
+      }
+
+      elements.applySettingsButton.addEventListener("click", applySettings);
+      elements.foulButton.addEventListener("click", recordFoul);
+      elements.missButton.addEventListener("click", () => recordMiss());
+      elements.rebuildTableButton.addEventListener("click", rebuildTable);
+      elements.resetButton.addEventListener("click", resetGame);
+      elements.settingsButton.addEventListener("click", () => elements.setupPanel.classList.toggle("open"));
+      elements.switchButton.addEventListener("click", manualSwitch);
+      elements.undoButton.addEventListener("click", undo);
+      elements.zeroButton.addEventListener("click", () => recordMiss("0er Aufnahme"));
+      elements.quickButtons.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-balls-on-table]");
+        if (button) recordBallsOnTable(button.dataset.ballsOnTable);
+      });
+      renderQuickButtons();
+      render();
+    </script>
+  </body>
+</html>
