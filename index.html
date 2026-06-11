@@ -21,6 +21,22 @@
         --shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
       }
 
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f5f1e7;
+        --panel: #fffaf0;
+        --panel-strong: #ede4d3;
+        --table: #35a87f;
+        --table-dark: #238463;
+        --line: #d4c8b5;
+        --text: #171411;
+        --muted: #6d6258;
+        --danger: #c8453f;
+        --warning: #b87916;
+        --ok: #21865a;
+        --shadow: 0 20px 60px rgba(72, 57, 33, 0.18);
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -34,6 +50,12 @@
         color: var(--text);
         font-family:
           Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      :root[data-theme="light"] body {
+        background:
+          radial-gradient(circle at top left, rgba(53, 168, 127, 0.26), transparent 34rem),
+          linear-gradient(135deg, #f5f1e7 0%, #fffaf0 54%, #ece2cf 100%);
       }
 
       button,
@@ -131,6 +153,12 @@
         box-shadow: var(--shadow);
       }
 
+      :root[data-theme="light"] .scoreboard,
+      :root[data-theme="light"] .side,
+      :root[data-theme="light"] .setup {
+        background: rgba(255, 250, 240, 0.94);
+      }
+
       .scoreboard {
         overflow: hidden;
       }
@@ -172,10 +200,19 @@
           border-color 160ms ease;
       }
 
+      :root[data-theme="light"] .player {
+        background: rgba(255, 255, 255, 0.32);
+      }
+
       .player.active {
         border-color: rgba(255, 255, 255, 0.7);
         background: rgba(255, 255, 255, 0.12);
         transform: translateY(-2px);
+      }
+
+      :root[data-theme="light"] .player.active {
+        border-color: rgba(23, 20, 17, 0.5);
+        background: rgba(255, 255, 255, 0.5);
       }
 
       .player.winner {
@@ -509,6 +546,7 @@
           <button class="btn" id="settingsButton" type="button">Einstellungen</button>
           <button class="btn" id="undoButton" type="button">Undo</button>
           <button class="btn danger" id="resetButton" type="button">Neues Spiel</button>
+          <button class="btn" id="themeButton" type="button">Hellmodus</button>
         </div>
       </header>
 
@@ -591,6 +629,7 @@
         target: 100,
         active: 0,
         ballsOnTable: 15,
+        theme: "dark",
         winner: null,
         players: [
           { name: "Spieler 1", score: 0, innings: 0, highRun: 0, currentRun: 0, fouls: 0 },
@@ -621,6 +660,7 @@
         tableBallsLabel: document.querySelector("#tableBallsLabel"),
         targetInput: document.querySelector("#targetInput"),
         targetLabel: document.querySelector("#targetLabel"),
+        themeButton: document.querySelector("#themeButton"),
         undoButton: document.querySelector("#undoButton"),
         winnerBanner: document.querySelector("#winnerBanner"),
         zeroButton: document.querySelector("#zeroButton"),
@@ -644,6 +684,9 @@
           nextState.ballsOnTable = 15;
         }
         nextState.ballsOnTable = Math.max(1, Math.min(15, nextState.ballsOnTable));
+        if (!["dark", "light"].includes(nextState.theme)) {
+          nextState.theme = "dark";
+        }
         nextState.players = nextState.players.map((player, index) => ({
           ...clone(defaultState.players[index]),
           ...player,
@@ -803,10 +846,12 @@
       function resetGame() {
         const names = state.players.map((player) => player.name);
         const target = state.target;
+        const theme = state.theme;
         state = clone(defaultState);
         state.players[0].name = names[0] || "Spieler 1";
         state.players[1].name = names[1] || "Spieler 2";
         state.target = target;
+        state.theme = theme;
         addHistory("Neues Spiel", "Zähler zurückgesetzt", "");
         persistAndRender();
       }
@@ -824,6 +869,20 @@
       function persistAndRender() {
         saveState();
         render();
+      }
+
+      function applyTheme() {
+        document.documentElement.dataset.theme = state.theme;
+        elements.themeButton.textContent = state.theme === "dark" ? "Hellmodus" : "Dunkelmodus";
+        elements.themeButton.setAttribute(
+          "aria-label",
+          state.theme === "dark" ? "Zum Hellmodus wechseln" : "Zum Dunkelmodus wechseln",
+        );
+      }
+
+      function toggleTheme() {
+        state.theme = state.theme === "dark" ? "light" : "dark";
+        persistAndRender();
       }
 
       function renderPlayers() {
@@ -898,6 +957,7 @@
       }
 
       function render() {
+        applyTheme();
         renderPlayers();
         renderHistory();
         renderQuickButtons();
@@ -940,6 +1000,7 @@
       elements.resetButton.addEventListener("click", resetGame);
       elements.settingsButton.addEventListener("click", () => elements.setupPanel.classList.toggle("open"));
       elements.switchButton.addEventListener("click", manualSwitch);
+      elements.themeButton.addEventListener("click", toggleTheme);
       elements.undoButton.addEventListener("click", undo);
       elements.zeroButton.addEventListener("click", () => recordMiss("0er Aufnahme"));
       elements.quickButtons.addEventListener("click", (event) => {
